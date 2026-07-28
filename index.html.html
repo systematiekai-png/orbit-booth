@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Orbit Booth — 360° Video Booth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0B0D;
+    --surface:#151418;
+    --surface-2:#1D1B21;
+    --line:#2B2932;
+    --text:#F3F1EA;
+    --muted:#9A968C;
+    --accent:#7C6FF0;
+    --accent-2:#B8AFFF;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:radial-gradient(120% 140% at 50% -10%, #1a1820 0%, #0B0B0D 55%);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  .app{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    width:100%;
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:22px clamp(20px,4vw,48px) 8px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:19px;
+    letter-spacing:0.01em;
+  }
+  .brand .ring{
+    width:22px;height:22px;border-radius:50%;
+    border:2.5px solid var(--accent);
+    border-top-color:transparent;
+    border-right-color:transparent;
+    transform:rotate(45deg);
+  }
+  .steps{
+    display:flex;
+    gap:clamp(10px,3vw,28px);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.03em;
+  }
+  .step{
+    display:flex; align-items:center; gap:7px;
+    color:var(--muted);
+    transition:color .3s ease;
+  }
+  .step .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--line);
+    transition:background .3s ease, box-shadow .3s ease;
+  }
+  .step.active{color:var(--text);}
+  .step.active .dot{background:var(--accent); box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);}
+  .step.done .dot{background:var(--accent-2);}
+  .step span.label{display:none;}
+  @media(min-width:640px){ .step span.label{display:inline;} }
+  .reset-link{
+    background:none;border:none;color:var(--muted);
+    font-family:'Inter',sans-serif; font-size:12px;
+    cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+    opacity:.7;
+  }
+  .reset-link:hover{opacity:1;}
+
+  main{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px clamp(20px,4vw,48px) 48px;
+  }
+  .screen{display:none; width:100%; max-width:1040px;}
+  .screen.active{display:block; animation:fade .45s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:clamp(26px,4vw,38px);
+    margin:0 0 6px;
+  }
+  .sub{color:var(--muted); font-size:14.5px; margin:0 0 32px; max-width:520px; line-height:1.5;}
+
+  /* ---------- Templates screen ---------- */
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;}
+  .chip{
+    padding:9px 16px; border-radius:999px;
+    background:var(--surface); border:1.5px solid var(--line);
+    color:var(--muted); font-size:13px; font-weight:500;
+    cursor:pointer; transition:.2s ease;
+  }
+  .chip.active{background:var(--text); color:#0B0B0D; border-color:var(--text);}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    gap:16px;
+    margin-bottom:28px;
+  }
+  .card{
+    background:var(--surface);
+    border:1.5px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 20px;
+    cursor:pointer;
+    text-align:left;
+    transition:border-color .2s ease, transform .2s ease, background .2s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .card:hover{transform:translateY(-2px);}
+  .card.selected{border-color:var(--card-accent, var(--accent)); background:var(--surface-2);}
+  .card.selected::after{
+    content:"✓"; position:absolute; top:14px; right:16px;
+    width:22px;height:22px;border-radius:50%;
+    background:var(--card-accent, var(--accent));
+    color:#0B0B0D; font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card .swatch{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--card-accent, var(--accent));
+    margin-bottom:16px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:17px;
+  }
+  .card h3{
+    font-family:'Fraunces',serif; font-weight:600; font-size:19px; margin:0 0 4px;
+  }
+  .card p{color:var(--muted); font-size:13px; margin:0;}
+
+  .custom-fields{
+    display:none;
+    margin-top:-6px;
+    margin-bottom:6px;
+  }
+  .custom-fields.visible{display:flex; gap:12px; flex-wrap:wrap;}
+  .custom-fields input[type=color]{
+    width:52px; height:44px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--surface); padding:2px; cursor:pointer;
+  }
+
+  .field-row{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px;}
+  .field{flex:1; min-width:220px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:7px; letter-spacing:.02em;}
+  .field input{
+    width:100%; padding:13px 14px; border-radius:12px;
+    background:var(--surface); border:1.5px solid var(--line);
+    color:var(--text); font-family:'Inter',sans-serif; font-size:14.5px;
+  }
+  .field input:focus{outline:none; border-color:var(--accent);}
+
+  .btn{
+    appearance:none; border:none; cursor:pointer;
+    padding:15px 28px; border-radius:14px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px;
+    background:var(--accent); color:#0B0B0D;
+    transition:transform .15s ease, opacity .2s ease, background .2s ease;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn:disabled{opacity:.35; cursor:not-allowed; transform:none;}
+  .btn.ghost{background:transparent; color:var(--text); border:1.5px solid var(--line);}
+  .btn.ghost:hover{border-color:var(--muted);}
+  .actions{display:flex; gap:12px; flex-wrap:wrap;}
+
+  /* ---------- Record screen ---------- */
+  .record-wrap{display:flex; flex-direction:column; align-items:center; gap:22px;}
+  .stage{
+    position:relative;
+    width:min(340px, 78vw);
+    aspect-ratio:9/16;
+    border-radius:26px;
+    overflow:hidden;
+    background:#000;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.7);
+  }
+  canvas{width:100%; height:100%; display:block;}
+  .cam-error{
+    position:absolute; inset:0; display:none; flex-direction:column; align-items:center;
+    justify-content:center; gap:14px; padding:24px; text-align:center;
+    background:var(--surface); color:var(--muted); font-size:13.5px;
+  }
+  .cam-error.visible{display:flex;}
+  .rec-controls{display:flex; align-items:center; gap:22px;}
+  .shutter{
+    width:76px; height:76px; border-radius:50%;
+    background:none; border:3px solid var(--text); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:border-color .2s;
+  }
+  .shutter .inner{width:58px; height:58px; border-radius:50%; background:#E8567C; transition:.25s;}
+  .shutter.recording .inner{border-radius:14px; width:30px; height:30px; background:#E8567C;}
+  .icon-btn{
+    width:46px;height:46px;border-radius:50%;
+    background:var(--surface); border:1.5px solid var(--line);
+    color:var(--text); cursor:pointer; font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .rec-status{font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--muted); min-height:18px;}
+
+  /* ---------- Preview screen ---------- */
+  .preview-wrap{display:flex; flex-direction:column; align-items:center; gap:22px;}
+  .preview-wrap video{
+    width:min(340px, 78vw); aspect-ratio:9/16; border-radius:26px;
+    background:#000; box-shadow:0 30px 70px -20px rgba(0,0,0,.7);
+  }
+
+  /* ---------- QR screen ---------- */
+  .qr-wrap{display:flex; flex-wrap:wrap; gap:40px; align-items:center; justify-content:center;}
+  .qr-card{
+    background:#fff; padding:22px; border-radius:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .qr-copy{max-width:340px;}
+  .qr-copy h2{font-family:'Fraunces',serif; font-weight:600; font-size:22px; margin:0 0 10px;}
+  .qr-copy p{color:var(--muted); font-size:14px; line-height:1.6; margin:0 0 18px;}
+  .note{
+    font-size:12px; color:var(--muted); border-left:2px solid var(--line);
+    padding-left:12px; margin-top:18px; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="ring"></span> Orbit Booth</div>
+    <div class="steps">
+      <div class="step" data-step="1"><span class="dot"></span><span class="label">Template</span></div>
+      <div class="step" data-step="2"><span class="dot"></span><span class="label">Opname</span></div>
+      <div class="step" data-step="3"><span class="dot"></span><span class="label">Voorbeeld</span></div>
+      <div class="step" data-step="4"><span class="dot"></span><span class="label">QR</span></div>
+    </div>
+    <button class="reset-link" onclick="resetAll()">opnieuw beginnen</button>
+  </div>
+
+  <main>
+    <!-- SCREEN 1: TEMPLATES -->
+    <section class="screen active" id="screen-1">
+      <h1>Kies een template</h1>
+      <p class="sub">Elk sjabloon geeft de opname een eigen lijst, kleur en typografie. De gast ziet dit meteen terug in de opname op de tablet.</p>
+      <div class="chips" id="family-chips"></div>
+      <div class="grid" id="template-grid"></div>
+      <div class="custom-fields" id="custom-fields">
+        <div class="field" style="min-width:120px; flex:0;">
+          <label>Kleur</label>
+          <input type="color" id="custom-color" value="#7C6FF0">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Naam van het evenement</label>
+          <input type="text" id="event-name" placeholder="bv. Lisa & Tom, of Bedrijfsfeest SysAI">
+        </div>
+        <div class="field">
+          <label>Datum <span style="opacity:.6">(optioneel)</span></label>
+          <input type="text" id="event-date" placeholder="28 juli 2026">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btn-to-record" disabled onclick="goToRecord()">Start opname →</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: RECORD -->
+    <section class="screen" id="screen-2">
+      <div class="record-wrap">
+        <h1 style="margin-bottom:2px;">Draai rustig 360°</h1>
+        <p class="sub" style="margin-bottom:6px; text-align:center;">Druk op de knop en draai in <b>6 seconden</b> een volledige cirkel. De ring loopt mee met je rotatie.</p>
+        <div class="stage">
+          <canvas id="canvas" width="540" height="960"></canvas>
+          <div class="cam-error" id="cam-error">
+            <div>Geen camera gevonden of toegang geweigerd.</div>
+            <button class="btn ghost" onclick="initCamera()">Probeer opnieuw</button>
+          </div>
+        </div>
+        <div class="rec-status" id="rec-status">Camera wordt gestart…</div>
+        <div class="rec-controls">
+          <button class="icon-btn" onclick="flipCamera()" title="Camera wisselen">⟲</button>
+          <button class="shutter" id="shutter" onclick="handleShutter()">
+            <div class="inner"></div>
+          </button>
+          <button class="icon-btn" onclick="goToTemplates()" title="Terug">←</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: PREVIEW -->
+    <section class="screen" id="screen-3">
+      <div class="preview-wrap">
+        <h1 style="margin-bottom:2px;">Voorbeeld</h1>
+        <p class="sub" style="text-align:center;">Het sjabloon is al in de video verwerkt — dit is exact wat de gast straks op zijn telefoon ziet.</p>
+        <video id="preview-video" controls loop playsinline></video>
+        <div class="actions">
+          <button class="btn ghost" onclick="goToRecord()">Opnieuw opnemen</button>
+          <button class="btn" onclick="goToQr()">Gebruik deze video →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: QR -->
+    <section class="screen" id="screen-4">
+      <div class="qr-wrap">
+        <div class="qr-card" id="qr-code"></div>
+        <div class="qr-copy">
+          <h2>Scan om te bekijken</h2>
+          <p>Richt de camera van je telefoon op de QR-code om jouw video direct te bekijken en te downloaden.</p>
+          <div class="actions">
+            <button class="btn" onclick="resetAll()">Volgende gast →</button>
+            <a class="btn ghost" id="download-link" download="orbit-booth-video.webm" style="text-decoration:none; display:inline-flex; align-items:center;">Download op tablet</a>
+          </div>
+          <p class="note">Prototype-hint: deze QR verwijst hier naar een lokale bestandslink op dit apparaat, puur om de flow te testen. In productie upload de app de video eerst naar cloud storage en wijst de QR naar die publieke link, zodat elke telefoon 'm kan openen.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const templates = [
+  {id:'wedding-classic', family:'wedding', name:'Klassiek Goud', accent:'#C9A227', accent2:'#F3E7C6', icon:'💍', tagline:'Elegant · tijdloos'},
+  {id:'wedding-botanical', family:'wedding', name:'Botanisch', accent:'#7C9473', accent2:'#DDE6D3', icon:'🌿', tagline:'Zacht · organisch'},
+  {id:'wedding-minimal', family:'wedding', name:'Minimal Ivory', accent:'#B8AE94', accent2:'#F5F1E6', icon:'—', tagline:'Rustig · verfijnd'},
+  {id:'birthday-confetti', family:'birthday', name:'Confetti Pop', accent:'#E8567C', accent2:'#FFD166', icon:'🎉', tagline:'Vrolijk · kleurrijk'},
+  {id:'birthday-balloon', family:'birthday', name:'Ballon Pastel', accent:'#FF9EC4', accent2:'#BFE3FF', icon:'🎈', tagline:'Zacht · speels'},
+  {id:'birthday-neon', family:'birthday', name:'Neon Nacht', accent:'#39FF88', accent2:'#171A17', icon:'⚡', tagline:'Stoer · fel'},
+  {id:'corporate-steel', family:'corporate', name:'Steel Minimal', accent:'#4C6EF5', accent2:'#B9C6FF', icon:'◆', tagline:'Strak · zakelijk'},
+  {id:'corporate-bold', family:'corporate', name:'Bold Brand', accent:'#4C6EF5', accent2:'#111827', icon:'■', tagline:'Krachtig · merkgericht'},
+  {id:'corporate-navy', family:'corporate', name:'Navy Crop', accent:'#4E7AB5', accent2:'#1E3A5F', icon:'✚', tagline:'Precies · professioneel'},
+  {id:'custom', family:'custom', name:'Eigen ontwerp', accent:'#7C6FF0', accent2:'#D8D2FF', icon:'✎', tagline:'Eigen kleur & naam', custom:true},
+];
+const families = [
+  {id:'all', label:'Alle'},
+  {id:'wedding', label:'Bruiloft'},
+  {id:'birthday', label:'Verjaardag'},
+  {id:'corporate', label:'Bedrijfsfeest'},
+  {id:'custom', label:'Eigen'},
+];
+let activeFamily = 'all';
+
+let selectedTemplate = null;
+let stream = null, facingMode = 'user';
+let canvas, ctx, videoEl;
+let drawing = false, drawLoopId = null;
+let recorder, chunks = [], recording = false, recordStart = 0;
+const RECORD_MS = 6000;
+let recordedBlobUrl = null;
+
+// ---------- Template grid ----------
+const grid = document.getElementById('template-grid');
+const chipsWrap = document.getElementById('family-chips');
+
+families.forEach(f=>{
+  const chip = document.createElement('button');
+  chip.className = 'chip' + (f.id===activeFamily ? ' active' : '');
+  chip.textContent = f.label;
+  chip.onclick = ()=>{ activeFamily = f.id; renderGrid(); };
+  chip.dataset.family = f.id;
+  chipsWrap.appendChild(chip);
+});
+
+function renderGrid(){
+  chipsWrap.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.family===activeFamily));
+  grid.innerHTML = '';
+  const prevSelectedId = selectedTemplate ? selectedTemplate.id : null;
+  templates
+    .filter(t => activeFamily==='all' || t.family===activeFamily)
+    .forEach(t=>{
+      const card = document.createElement('div');
+      card.className = 'card' + (t.id===prevSelectedId ? ' selected' : '');
+      card.style.setProperty('--card-accent', t.accent);
+      card.innerHTML = `<div class="swatch">${t.icon}</div><h3>${t.name}</h3><p>${t.tagline}</p>`;
+      card.onclick = ()=>selectTemplate(t.id, card);
+      grid.appendChild(card);
+    });
+}
+renderGrid();
+
+function selectTemplate(id, cardEl){
+  selectedTemplate = templates.find(t=>t.id===id);
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  document.getElementById('custom-fields').classList.toggle('visible', !!selectedTemplate.custom);
+  checkTemplateReady();
+}
+document.getElementById('event-name').addEventListener('input', checkTemplateReady);
+document.getElementById('custom-color').addEventListener('input', e=>{
+  if(selectedTemplate && selectedTemplate.custom) selectedTemplate.accent = e.target.value;
+});
+function checkTemplateReady(){
+  const name = document.getElementById('event-name').value.trim();
+  document.getElementById('btn-to-record').disabled = !(selectedTemplate && name.length>0);
+}
+
+// ---------- Step nav ----------
+function setStep(n){
+  document.querySelectorAll('.step').forEach(s=>{
+    const i = +s.dataset.step;
+    s.classList.toggle('active', i===n);
+    s.classList.toggle('done', i<n);
+  });
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n).classList.add('active');
+}
+
+function goToTemplates(){ stopCamera(); setStep(1); }
+function goToRecord(){ setStep(2); initCamera(); }
+function goToPreview(){ setStep(3); }
+function goToQr(){
+  setStep(4);
+  document.getElementById('qr-code').innerHTML = '';
+  new QRCode(document.getElementById('qr-code'), {
+    text: recordedBlobUrl, width: 180, height: 180,
+    colorDark:'#0B0B0D', colorLight:'#ffffff'
+  });
+  document.getElementById('download-link').href = recordedBlobUrl;
+}
+function resetAll(){
+  stopCamera();
+  chunks = [];
+  selectedTemplate = null;
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('event-name').value = '';
+  document.getElementById('event-date').value = '';
+  document.getElementById('custom-fields').classList.remove('visible');
+  checkTemplateReady();
+  setStep(1);
+}
+
+// ---------- Camera + canvas compositing ----------
+canvas = document.getElementById('canvas');
+ctx = canvas.getContext('2d');
+videoEl = document.createElement('video');
+videoEl.muted = true; videoEl.playsInline = true;
+
+async function initCamera(){
+  document.getElementById('cam-error').classList.remove('visible');
+  document.getElementById('rec-status').textContent = 'Camera wordt gestart…';
+  stopStreamOnly();
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode }, audio:false });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+    document.getElementById('rec-status').textContent = 'Klaar — druk op de knop om te starten';
+    startDrawLoop();
+  }catch(err){
+    document.getElementById('cam-error').classList.add('visible');
+    document.getElementById('rec-status').textContent = '';
+  }
+}
+function flipCamera(){
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  initCamera();
+}
+function stopStreamOnly(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+}
+function stopCamera(){
+  drawing = false;
+  if(drawLoopId) cancelAnimationFrame(drawLoopId);
+  stopStreamOnly();
+  if(recording){ recording=false; try{recorder.stop();}catch(e){} }
+}
+
+function startDrawLoop(){
+  drawing = true;
+  const loop = ()=>{
+    if(!drawing) return;
+    drawFrame();
+    drawLoopId = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function drawFrame(){
+  const cw = canvas.width, ch = canvas.height;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,cw,ch);
+
+  if(videoEl.videoWidth){
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    const vRatio = vw/vh, cRatio = cw/ch;
+    let sx,sy,sw,sh;
+    if(vRatio > cRatio){ sh = vh; sw = vh*cRatio; sx = (vw-sw)/2; sy = 0; }
+    else{ sw = vw; sh = vw/cRatio; sx = 0; sy = (vh-sh)/2; }
+    ctx.save();
+    if(facingMode==='user'){ ctx.translate(cw,0); ctx.scale(-1,1); }
+    ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, cw, ch);
+    ctx.restore();
+  }
+
+  if(selectedTemplate) drawTemplateOverlay();
+
+  if(recording){
+    const elapsed = performance.now() - recordStart;
+    const progress = Math.min(elapsed/RECORD_MS, 1);
+    drawOrbitRing(progress);
+    if(progress>=1) stopRecording();
+  }
+}
+
+function drawOrbitRing(progress){
+  const cx = canvas.width-48, cy = 48, r = 24;
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = selectedTemplate.accent;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.arc(cx,cy,r, -Math.PI/2, -Math.PI/2 + progress*Math.PI*2);
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = '600 11px Inter';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(Math.round(progress*360)+'°', cx, cy);
+  ctx.restore();
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawTemplateOverlay(){
+  const cw=canvas.width, ch=canvas.height;
+  const t = selectedTemplate;
+  const name = document.getElementById('event-name').value.trim() || 'Jullie feest';
+  const date = document.getElementById('event-date').value.trim();
+  ctx.save();
+
+  if(t.id==='wedding-classic'){
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 2;
+    roundRect(16,16,cw-32,ch-32,24); ctx.stroke();
+    ctx.lineWidth = 1;
+    roundRect(24,24,cw-48,ch-48,18); ctx.stroke();
+    ctx.fillStyle = 'rgba(11,11,13,0.55)';
+    roundRect(16, ch-140, cw-32, 108, 16); ctx.fill();
+    ctx.fillStyle = t.accent;
+    ctx.font = '600 30px Fraunces'; ctx.textAlign='center';
+    ctx.fillText(name, cw/2, ch-92, cw-60);
+    if(date){ ctx.fillStyle='#F3F1EA'; ctx.font='500 13px Inter'; ctx.fillText(date, cw/2, ch-58); }
+
+  } else if(t.id==='wedding-botanical'){
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 2.5; ctx.lineCap='round';
+    // simple leaf sprigs in the top corners
+    [[24,24,1],[cw-24,24,-1]].forEach(([x,y,dir])=>{
+      for(let i=0;i<4;i++){
+        ctx.beginPath();
+        ctx.moveTo(x, y+i*16);
+        ctx.quadraticCurveTo(x+dir*26, y+i*16-6, x+dir*4, y+i*16+18);
+        ctx.stroke();
+      }
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.0)';
+    ctx.fillStyle = 'rgba(11,11,13,0.4)';
+    roundRect(16, ch-104, cw-32, 76, 14); ctx.fill();
+    ctx.fillStyle = t.accent2;
+    ctx.font = '500 24px Fraunces'; ctx.textAlign='center';
+    ctx.fillText(name, cw/2, ch-64, cw-60);
+    if(date){ ctx.fillStyle='#F3F1EA'; ctx.font='400 12px Inter'; ctx.fillText(date, cw/2, ch-38); }
+
+  } else if(t.id==='wedding-minimal'){
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cw/2-60, ch-70); ctx.lineTo(cw/2+60, ch-70); ctx.stroke();
+    ctx.fillStyle = '#F3F1EA';
+    ctx.font = '500 15px Inter'; ctx.textAlign='center';
+    ctx.fillText(name.toUpperCase(), cw/2, ch-44, cw-80);
+    if(date){ ctx.fillStyle=t.accent; ctx.font='400 11px "JetBrains Mono"'; ctx.fillText(date, cw/2, ch-22); }
+
+  } else if(t.id==='birthday-confetti'){
+    ctx.setLineDash([10,8]);
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 5;
+    roundRect(14,14,cw-28,ch-28,28); ctx.stroke();
+    ctx.setLineDash([]);
+    const seed=[18,60,120,180,cw-40,cw-90,cw-150,90,cw-60];
+    seed.forEach((x,i)=>{
+      ctx.fillStyle = i%2? t.accent2 : t.accent;
+      ctx.beginPath(); ctx.arc(x, 34+(i%3)*10, 5, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.fillStyle = t.accent;
+    roundRect(16, ch-118, cw-32, 90, 20); ctx.fill();
+    ctx.fillStyle = '#1A0A10';
+    ctx.font = '700 26px Fraunces'; ctx.textAlign='center';
+    ctx.fillText(name, cw/2, ch-72, cw-60);
+    if(date){ ctx.font='600 12px Inter'; ctx.fillText(date, cw/2, ch-42); }
+
+  } else if(t.id==='birthday-balloon'){
+    ctx.fillStyle = t.accent;
+    roundRect(16, ch-128, cw-32, 100, 30); ctx.fill();
+    for(let i=0;i<5;i++){
+      ctx.fillStyle = i%2? t.accent2 : '#fff';
+      ctx.beginPath(); ctx.ellipse(40+i*((cw-80)/4), ch-140, 9, 12, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(40+i*((cw-80)/4), ch-128); ctx.lineTo(40+i*((cw-80)/4), ch-118); ctx.stroke();
+    }
+    ctx.fillStyle = '#3A2233';
+    ctx.font = '700 24px Fraunces'; ctx.textAlign='center';
+    ctx.fillText(name, cw/2, ch-70, cw-70);
+    if(date){ ctx.font='600 11px Inter'; ctx.fillText(date, cw/2, ch-44); }
+
+  } else if(t.id==='birthday-neon'){
+    ctx.fillStyle = 'rgba(11,11,13,0.65)';
+    roundRect(16, ch-116, cw-32, 88, 12); ctx.fill();
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 2.5;
+    roundRect(16, ch-116, cw-32, 88, 12); ctx.stroke();
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 1.5;
+    roundRect(14,14,cw-28,ch-28,10); ctx.stroke();
+    ctx.font = '700 26px Fraunces'; ctx.textAlign='center';
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 1.2;
+    ctx.strokeText(name, cw/2, ch-68, cw-70);
+    ctx.fillStyle = t.accent;
+    ctx.fillText(name, cw/2, ch-68, cw-70);
+    if(date){ ctx.fillStyle='#F3F1EA'; ctx.font='500 11px "JetBrains Mono"'; ctx.fillText(date, cw/2, ch-40); }
+
+  } else if(t.id==='corporate-steel'){
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(24,ch-100); ctx.lineTo(cw-24,ch-100); ctx.stroke();
+    ctx.fillStyle = t.accent;
+    ctx.fillRect(24, ch-84, 10, 40);
+    ctx.fillStyle = '#F3F1EA';
+    ctx.font = '600 22px Inter'; ctx.textAlign='left';
+    ctx.fillText(name.toUpperCase(), 46, ch-58, cw-90);
+    if(date){ ctx.fillStyle=t.accent2; ctx.font='500 12px "JetBrains Mono"'; ctx.fillText(date, 46, ch-32); }
+
+  } else if(t.id==='corporate-bold'){
+    ctx.fillStyle = t.accent;
+    ctx.fillRect(0, ch-110, cw, 110);
+    ctx.fillStyle = t.accent2;
+    roundRect(cw-58, 20, 34, 34, 6); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 26px Inter'; ctx.textAlign='left';
+    ctx.fillText(name.toUpperCase(), 24, ch-56, cw-48);
+    if(date){ ctx.font='500 12px "JetBrains Mono"'; ctx.fillText(date, 24, ch-28); }
+
+  } else if(t.id==='corporate-navy'){
+    ctx.strokeStyle = t.accent2; ctx.lineWidth = 2;
+    const tick=16;
+    [[20,20,1,1],[cw-20,20,-1,1],[20,ch-20,1,-1],[cw-20,ch-20,-1,-1]].forEach(([x,y,dx,dy])=>{
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx*tick,y); ctx.moveTo(x,y); ctx.lineTo(x,y+dy*tick); ctx.stroke();
+    });
+    ctx.fillStyle = t.accent2;
+    ctx.font = '500 11px "JetBrains Mono"'; ctx.textAlign='left';
+    ctx.fillText('EVENT', 30, 46);
+    ctx.fillStyle = '#F3F1EA';
+    ctx.font = '600 22px Inter';
+    ctx.fillText(name, 30, ch-40, cw-60);
+    if(date){ ctx.fillStyle=t.accent2; ctx.font='500 11px "JetBrains Mono"'; ctx.fillText(date, 30, ch-18); }
+
+  } else {
+    ctx.strokeStyle = t.accent; ctx.lineWidth = 3;
+    roundRect(18,18,cw-36,ch-36,26); ctx.stroke();
+    ctx.fillStyle = 'rgba(11,11,13,0.55)';
+    roundRect(16, ch-120, cw-32, 92, 18); ctx.fill();
+    ctx.fillStyle = t.accent;
+    ctx.font = '600 26px Fraunces'; ctx.textAlign='center';
+    ctx.fillText(name, cw/2, ch-76, cw-60);
+    if(date){ ctx.fillStyle='#F3F1EA'; ctx.font='500 12px Inter'; ctx.fillText(date, cw/2, ch-46); }
+  }
+  ctx.restore();
+}
+
+// ---------- Recording ----------
+function handleShutter(){
+  if(recording) return;
+  startCountdownThenRecord();
+}
+function startCountdownThenRecord(){
+  let n = 3;
+  document.getElementById('shutter').disabled = true;
+  const status = document.getElementById('rec-status');
+  const tick = ()=>{
+    if(n>0){
+      status.textContent = 'Start over ' + n + '…';
+      n--; setTimeout(tick, 700);
+    } else {
+      status.textContent = 'Draai nu rustig 360°…';
+      startRecording();
+    }
+  };
+  tick();
+}
+function startRecording(){
+  chunks = [];
+  const canvasStream = canvas.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  recorder = new MediaRecorder(canvasStream, { mimeType: mime });
+  recorder.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+  recorder.onstop = onRecordingStop;
+  recorder.start();
+  recording = true;
+  recordStart = performance.now();
+  document.getElementById('shutter').classList.add('recording');
+}
+function stopRecording(){
+  if(!recording) return;
+  recording = false;
+  document.getElementById('shutter').classList.remove('recording');
+  document.getElementById('shutter').disabled = false;
+  document.getElementById('rec-status').textContent = 'Verwerken…';
+  try{ recorder.stop(); }catch(e){}
+}
+function onRecordingStop(){
+  const blob = new Blob(chunks, {type:'video/webm'});
+  recordedBlobUrl = URL.createObjectURL(blob);
+  const pv = document.getElementById('preview-video');
+  pv.src = recordedBlobUrl;
+  goToPreview();
+}
+
+// init
+setStep(1);
+</script>
+</body>
+</html>
