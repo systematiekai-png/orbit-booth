@@ -348,6 +348,8 @@ const templates = [
   {id:'wedding-classic', family:'wedding', name:'Klassiek Goud', accent:'#C9A227', accent2:'#F3E7C6', icon:'💍', tagline:'Elegant · tijdloos'},
   {id:'wedding-botanical', family:'wedding', name:'Botanisch', accent:'#7C9473', accent2:'#DDE6D3', icon:'🌿', tagline:'Zacht · organisch'},
   {id:'wedding-minimal', family:'wedding', name:'Minimal Ivory', accent:'#B8AE94', accent2:'#F5F1E6', icon:'—', tagline:'Rustig · verfijnd'},
+  {id:'wedding-script', family:'wedding', name:'Script Lijn', accent:'#D9D4C7', accent2:'#F5F1E6', icon:'✒', tagline:'Filter-stijl · minimal'},
+  {id:'wedding-frame', family:'wedding', name:'Sierrand', accent:'#D9D4C7', accent2:'#F5F1E6', icon:'❀', tagline:'Klassiek · ornamenteel'},
   {id:'birthday-confetti', family:'birthday', name:'Confetti Pop', accent:'#E8567C', accent2:'#FFD166', icon:'🎉', tagline:'Vrolijk · kleurrijk'},
   {id:'birthday-balloon', family:'birthday', name:'Ballon Pastel', accent:'#FF9EC4', accent2:'#BFE3FF', icon:'🎈', tagline:'Zacht · speels'},
   {id:'birthday-neon', family:'birthday', name:'Neon Nacht', accent:'#39FF88', accent2:'#171A17', icon:'⚡', tagline:'Stoer · fel'},
@@ -599,6 +601,63 @@ function drawTemplateOverlay(){
     ctx.font = '500 15px Inter'; ctx.textAlign='center';
     ctx.fillText(name.toUpperCase(), cw/2, ch-44, cw-80);
     if(date){ ctx.fillStyle=t.accent; ctx.font='400 11px "JetBrains Mono"'; ctx.fillText(date, cw/2, ch-22); }
+
+  } else if(t.id==='wedding-script'){
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.5; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(56, 70);
+    let side=1;
+    for(let y=70; y<ch-160; y+=42){
+      ctx.quadraticCurveTo(56+side*13, y+21, 56, y+42);
+      side*=-1;
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.font='15px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('♥', 56, ch/2 - 40);
+    ctx.save();
+    ctx.translate(90, ch/2 + 30);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillStyle='#fff';
+    ctx.font = 'italic 500 25px Fraunces';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(name, 0, 0, ch-230);
+    ctx.restore();
+    if(date){
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.font='500 13px Inter'; ctx.textAlign='right';
+      ctx.fillText(date, cw-24, ch-28);
+    }
+
+  } else if(t.id==='wedding-frame'){
+    const flourish=(x,y,mx,my)=>{
+      ctx.save(); ctx.translate(x,y); ctx.scale(mx,my);
+      ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=1.3;
+      ctx.beginPath();
+      ctx.moveTo(0,28); ctx.quadraticCurveTo(0,0, 28,0);
+      ctx.moveTo(9,28); ctx.quadraticCurveTo(9,11, 28,11);
+      ctx.moveTo(0,15); ctx.quadraticCurveTo(15,15,15,0);
+      ctx.stroke();
+      ctx.restore();
+    };
+    flourish(20,20,1,1); flourish(cw-20,20,-1,1);
+    flourish(20,ch-20,1,-1); flourish(cw-20,ch-20,-1,-1);
+    const grad = ctx.createLinearGradient(0,ch-220,0,ch);
+    grad.addColorStop(0,'rgba(11,11,13,0)');
+    grad.addColorStop(1,'rgba(11,11,13,0.6)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,ch-220,cw,220);
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.font='500 12px Inter'; ctx.textAlign='center';
+    ctx.fillText('MR & MRS', cw/2, ch-96);
+    ctx.fillStyle='#fff';
+    ctx.font='italic 600 32px Fraunces';
+    ctx.fillText(name, cw/2, ch-58, cw-60);
+    if(date){
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.font='400 13px Inter';
+      ctx.fillText(date, cw/2, ch-30);
+    }
 
   } else if(t.id==='birthday-confetti'){
     ctx.setLineDash([10,8]);
