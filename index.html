@@ -119,6 +119,20 @@
     cursor:pointer; transition:.2s ease;
   }
   .chip.active{background:var(--text); color:#0B0B0D; border-color:var(--text);}
+  .builder-panel{
+    background:var(--surface); border:1.5px solid var(--line); border-radius:var(--radius);
+    padding:22px; margin-bottom:28px;
+  }
+  .builder-panel select{
+    width:100%; padding:13px 14px; border-radius:12px;
+    background:var(--surface-2); border:1.5px solid var(--line);
+    color:var(--text); font-family:'Inter',sans-serif; font-size:14.5px;
+  }
+  .builder-panel input[type=file]{
+    width:100%; padding:11px 12px; border-radius:12px;
+    background:var(--surface-2); border:1.5px solid var(--line);
+    color:var(--muted); font-size:13px;
+  }
   .grid{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
@@ -268,6 +282,45 @@
       <p class="sub">Elk sjabloon geeft de opname een eigen lijst, kleur en typografie. De gast ziet dit meteen terug in de opname op de tablet.</p>
       <div class="chips" id="family-chips"></div>
       <div class="grid" id="template-grid"></div>
+
+      <div style="margin-bottom:16px;">
+        <button class="chip" id="toggle-builder" onclick="toggleBuilder()">+ Eigen template toevoegen</button>
+      </div>
+      <div class="builder-panel" id="builder-panel" style="display:none;">
+        <div class="field-row">
+          <div class="field"><label>Template naam</label><input id="tpl-name" type="text" placeholder="bv. Mijn romantische stijl"></div>
+          <div class="field" style="min-width:90px; flex:0;"><label>Kleur</label><input id="tpl-color" type="color" value="#7C6FF0"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Randstijl</label>
+            <select id="tpl-frame">
+              <option value="flourish">Ornamentele hoeken</option>
+              <option value="dashedBorder">Gestippelde rand</option>
+              <option value="bottomBar">Kleurblok onderaan</option>
+              <option value="sideScript">Script-lijn opzij</option>
+              <option value="minimalLine">Minimale lijn</option>
+            </select>
+          </div>
+          <div class="field"><label>Tekststijl</label>
+            <select id="tpl-text">
+              <option value="scriptItalic">Cursief · elegant</option>
+              <option value="boldSans">Bold · modern</option>
+              <option value="neonOutline">Neon · outline</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Foto uploaden voor AI-suggestie <span style="opacity:.6">(optioneel)</span></label>
+            <input id="tpl-photo" type="file" accept="image/*">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="btn-ai" onclick="analyzeWithAI()">Analyseer foto met AI</button>
+          <button class="btn" onclick="saveCustomTemplate()">Template toevoegen</button>
+        </div>
+        <div class="rec-status" id="builder-status" style="margin-top:10px;"></div>
+      </div>
       <div class="custom-fields" id="custom-fields">
         <div class="field" style="min-width:120px; flex:0;">
           <label>Kleur</label>
@@ -366,6 +419,92 @@ const families = [
   {id:'custom', label:'Eigen'},
 ];
 let activeFamily = 'all';
+let customTemplates = [];
+
+function toTemplateObj(ct){
+  return { id: ct.id, family:'custom', name: ct.name, accent: ct.accent, accent2: ct.accent2||ct.accent, icon:'✦', tagline:'Eigen template', custom:true, generic:true, frameStyle: ct.frameStyle, textStyle: ct.textStyle };
+}
+async function persistCustomTemplates(){
+  try{ await window.storage.set('custom-templates', JSON.stringify(customTemplates), false); }
+  catch(e){ /* best effort */ }
+}
+async function loadCustomTemplates(){
+  try{
+    const res = await window.storage.get('custom-templates', false);
+    if(res && res.value){ customTemplates = JSON.parse(res.value); }
+  }catch(e){ customTemplates = []; }
+  customTemplates.forEach(ct => templates.push(toTemplateObj(ct)));
+  renderGrid();
+}
+function toggleBuilder(){
+  const panel = document.getElementById('builder-panel');
+  panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+}
+function saveCustomTemplate(){
+  const name = document.getElementById('tpl-name').value.trim();
+  const status = document.getElementById('builder-status');
+  if(!name){ status.textContent = 'Geef je template een naam.'; return; }
+  const color = document.getElementById('tpl-color').value;
+  const frameStyle = document.getElementById('tpl-frame').value;
+  const textStyle = document.getElementById('tpl-text').value;
+  const ct = { id:'custom-'+Date.now(), name, accent:color, accent2:color, frameStyle, textStyle };
+  customTemplates.push(ct);
+  persistCustomTemplates();
+  templates.push(toTemplateObj(ct));
+  activeFamily = 'custom';
+  renderGrid();
+  status.textContent = 'Toegevoegd! Je vindt \u2019m terug onder "Eigen".';
+  document.getElementById('tpl-name').value = '';
+}
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=> resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+async function analyzeWithAI(){
+  const file = document.getElementById('tpl-photo').files[0];
+  const status = document.getElementById('builder-status');
+  const btn = document.getElementById('btn-ai');
+  if(!file){ status.textContent = 'Upload eerst een foto.'; return; }
+  status.textContent = 'AI analyseert de foto\u2026';
+  btn.disabled = true;
+  try{
+    const base64 = await fileToBase64(file);
+    const mediaType = file.type || 'image/jpeg';
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:300,
+        messages:[{
+          role:'user',
+          content:[
+            { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 } },
+            { type:'text', text:'Kijk naar deze foto (bv. een trouw-, verjaardags- of feestfoto) en stel op basis van de sfeer en kleuren een videobooth-sjabloon voor. Antwoord ALLEEN met geldige JSON, geen uitleg, geen markdown, exact in dit formaat: {"name":"korte stijlnaam in het Nederlands","accent":"#hexcode","accent2":"#hexcode","frameStyle":"flourish|dashedBorder|bottomBar|sideScript|minimalLine","textStyle":"scriptItalic|boldSans|neonOutline"}' }
+          ]
+        }]
+      })
+    });
+    const data = await response.json();
+    const textBlock = (data.content||[]).find(b=>b.type==='text');
+    if(!textBlock) throw new Error('no text');
+    const clean = textBlock.text.replace(/```json|```/g,'').trim();
+    const spec = JSON.parse(clean);
+    if(spec.accent) document.getElementById('tpl-color').value = spec.accent;
+    if(spec.frameStyle) document.getElementById('tpl-frame').value = spec.frameStyle;
+    if(spec.textStyle) document.getElementById('tpl-text').value = spec.textStyle;
+    if(spec.name && !document.getElementById('tpl-name').value.trim()) document.getElementById('tpl-name').value = spec.name;
+    status.textContent = 'AI-suggestie ingevuld \u2014 pas eventueel aan en klik "Template toevoegen".';
+  }catch(err){
+    status.textContent = 'AI-analyse is niet gelukt. Vul de stijl handmatig in en klik "Template toevoegen".';
+  }finally{
+    btn.disabled = false;
+  }
+}
 
 let selectedTemplate = null;
 let stream = null, facingMode = 'user';
@@ -562,6 +701,62 @@ function drawTemplateOverlay(){
   const name = document.getElementById('event-name').value.trim() || 'Jullie feest';
   const date = document.getElementById('event-date').value.trim();
   ctx.save();
+
+  if(t.generic){
+    const accent = t.accent, accent2 = t.accent2 || t.accent;
+    if(t.frameStyle==='flourish'){
+      const flourish=(x,y,mx,my)=>{
+        ctx.save(); ctx.translate(x,y); ctx.scale(mx,my);
+        ctx.strokeStyle=accent; ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(0,26); ctx.quadraticCurveTo(0,0,26,0);
+        ctx.moveTo(8,26); ctx.quadraticCurveTo(8,10,26,10);
+        ctx.stroke(); ctx.restore();
+      };
+      flourish(20,20,1,1); flourish(cw-20,20,-1,1);
+      flourish(20,ch-20,1,-1); flourish(cw-20,ch-20,-1,-1);
+    } else if(t.frameStyle==='dashedBorder'){
+      ctx.setLineDash([10,8]); ctx.strokeStyle=accent; ctx.lineWidth=4;
+      roundRect(14,14,cw-28,ch-28,26); ctx.stroke(); ctx.setLineDash([]);
+    } else if(t.frameStyle==='bottomBar'){
+      ctx.fillStyle=accent; ctx.fillRect(0,ch-100,cw,100);
+    } else if(t.frameStyle==='sideScript'){
+      ctx.strokeStyle=accent; ctx.lineWidth=1.5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(50,60); ctx.lineTo(50,ch-160); ctx.stroke();
+    } else {
+      ctx.strokeStyle=accent; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cw/2-60,ch-70); ctx.lineTo(cw/2+60,ch-70); ctx.stroke();
+    }
+
+    if(t.frameStyle==='sideScript'){
+      ctx.save(); ctx.translate(80, ch/2+30); ctx.rotate(-Math.PI/2);
+      ctx.fillStyle = t.textStyle==='neonOutline' ? accent : '#fff';
+      ctx.font = t.textStyle==='boldSans' ? '700 24px Inter' : 'italic 500 24px Fraunces';
+      ctx.textAlign='center';
+      ctx.fillText(name, 0, 0, ch-220);
+      ctx.restore();
+    } else {
+      ctx.textAlign='center';
+      const baseY = ch-48;
+      if(t.textStyle==='neonOutline'){
+        ctx.font='700 26px Fraunces';
+        ctx.strokeStyle=accent; ctx.lineWidth=1.2; ctx.strokeText(name, cw/2, baseY, cw-60);
+        ctx.fillStyle=accent; ctx.fillText(name, cw/2, baseY, cw-60);
+      } else if(t.textStyle==='boldSans'){
+        ctx.fillStyle='#fff'; ctx.font='700 24px Inter';
+        ctx.fillText(name.toUpperCase(), cw/2, baseY, cw-60);
+      } else {
+        ctx.fillStyle='#fff'; ctx.font='italic 600 28px Fraunces';
+        ctx.fillText(name, cw/2, baseY, cw-60);
+      }
+      if(date){
+        ctx.fillStyle=accent2; ctx.font='500 12px Inter';
+        ctx.fillText(date, cw/2, baseY+26);
+      }
+    }
+    ctx.restore();
+    return;
+  }
 
   if(t.id==='wedding-classic'){
     ctx.strokeStyle = t.accent; ctx.lineWidth = 2;
@@ -800,6 +995,7 @@ function onRecordingStop(){
 }
 
 // init
+loadCustomTemplates();
 setStep(1);
 </script>
 </body>
